@@ -15,7 +15,7 @@ ES_ingest <- function(cache) {
 extract_metadata <- function(df) {
   cells <- colnames(df)[2:length(colnames(df))]
   meta_df <- data.frame(cell_name = cells) %>% 
-    mutate(cell_line = str_extract(cell_name, "^[:alpha:][:digit:]{3}"))
+    mutate(cell_line = str_extract(cell_name, "^[:alpha:][:digit:]{3}")) #This is regex to grab cell line names
 }
 
 df_seurat <- CreateSeuratObject(df) # why does this take an eternity?
