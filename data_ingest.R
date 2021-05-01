@@ -23,6 +23,8 @@ ES_ingest <- function(cache) {
   exp_df <- exp_df[,c("GENE",meta_df$cell)] %>% 
     rename(gene = GENE)
   
+  #only meta data cells that are present in the counts matrix
+  meta_df <- meta_df %>% filter(cell %in% colnames(exp_df))
   return(list(meta_df, exp_df))
 }
 
@@ -34,9 +36,13 @@ neuro_ingest <- function() {
     filter(cell_type %in% c("Neuroepithelial", "Radial Glial")) %>% 
     mutate(group = "brain_study", 
            subgroup = cell_type) %>% 
-    select(cell, group, subgroup)
+    select(cell, group, subgroup) %>% 
+    sample_n(size = 1000)
   
   exp_df <- exp_df[,c("gene",meta_df$cell)] #keep only the columns in meta_df
+  
+  #only meta data cells that are present in the counts matrix
+  meta_df <- meta_df %>% filter(cell %in% colnames(exp_df))
   return(list(meta_df, exp_df))
   
 }
