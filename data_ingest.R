@@ -28,6 +28,10 @@ ES_ingest <- function(cache) {
   return(list(meta_df, exp_df))
 }
 
+ES_ingest_raw <- function(cache) {
+  test <- read_tsv(paste0(cache, "/GSE130025_RAW/", "GSM3730172_A472U295.mapped.counts.txt.gz"))
+}
+
 neuro_ingest <- function() {
   
   exp_df <- read_tsv("https://cells-test.gi.ucsc.edu/early-brain/exprMatrix.tsv.gz")
@@ -52,7 +56,7 @@ ES_list <- ES_ingest(cache)
 neuro_list <- neuro_ingest()
 
 meta_df <- bind_rows(ES_list[[1]], neuro_list[[1]])
-exp_df <- left_join(ES_list[[2]], neuro_list[[2]])
+exp_df <- left_join(neuro_list[[2]],ES_list[[2]])
 
 rm(ES_list, neuro_list)
 cleaned_data <- list(meta_df, exp_df)
