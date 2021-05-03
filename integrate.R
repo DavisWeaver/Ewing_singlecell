@@ -1,7 +1,7 @@
 #load packages
 library(readr); library(Seurat); 
 library(dplyr); library(stringr)
-library(naniar)
+
 
 ##set globals
 cache <-  "G:/My Drive/data/ES_singleCell"
@@ -37,6 +37,7 @@ clean_meta <- function() {
 counts <- clean_counts()
 meta <- clean_meta()
 
+table(meta$group)
 
 ## THis takes a while 
 seur_obj <- CreateSeuratObject(counts = counts, project = "ES_origin", 

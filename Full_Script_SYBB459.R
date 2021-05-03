@@ -1,19 +1,24 @@
 library(readr); library(Seurat); 
 library(dplyr); library(stringr)
 
+####### Import and prep the data ######
 #set globals
-cache <-  "..."
+cache <-  "G:/My Drive/data/ES_singleCell"
 
 #bring in sc data from our seed paper
 ES_ingest <- function(cache) {
-  exp_df <- read_tsv(file = paste0(cache, "/aggregated_1964.txt"))
-  meta_df <- read_tsv(file = paste0(cache, "/sample_description.txt")) 
+  exp_df <- read_tsv(file = paste0(cache, "/inducible_cell_line_data/aggregated_1964.txt"))
+  meta_df <- read_tsv(file = paste0(cache, "/inducible_cell_line_data/sample_description.txt")) 
   
   #clean up the metadata - here we limit our cells to ES cells from cell lines that
   #are either low expressing of EWS_fli1 or high expressing. We also select MSC cell line cells and myoblasts.
   meta_df <- meta_df %>% janitor::clean_names() %>% 
-    filter(group == "MSC") %>% 
-    mutate(subgroup = ifelse(subgroup == "22", "EWS_high", subgroup)) %>% 
+    filter(group == "MSC" | group == "MYOBLASTS" | 
+             group == "ASP14" & subgroup %in% c("7", "22") |
+             group == "PDX") %>% 
+    mutate(subgroup = ifelse(subgroup == "7", "EWS_low", subgroup), 
+           subgroup = ifelse(subgroup == "22", "EWS_high", subgroup), 
+           subgroup = ifelse(group != "ASP14", group, subgroup)) %>% 
     select(-name) %>% 
     rename(cell = sample)
   exp_df <- exp_df[,c("GENE",meta_df$cell)] %>% 
@@ -22,10 +27,6 @@ ES_ingest <- function(cache) {
   #only meta data cells that are present in the counts matrix
   meta_df <- meta_df %>% filter(cell %in% colnames(exp_df))
   return(list(meta_df, exp_df))
-}
-
-ES_ingest_raw <- function(cache) {
-  test <- read_tsv(paste0(cache, "/GSE130025_RAW/", "GSM3730172_A472U295.mapped.counts.txt.gz"))
 }
 
 neuro_ingest <- function() {
@@ -37,7 +38,7 @@ neuro_ingest <- function() {
     mutate(group = "brain_study", 
            subgroup = cell_type) %>% 
     select(cell, group, subgroup) %>% 
-    sample_n(size = 1000)
+    sample_n(size = 500)
   
   exp_df <- exp_df[,c("gene",meta_df$cell)] #keep only the columns in meta_df
   
@@ -47,7 +48,6 @@ neuro_ingest <- function() {
   
 }
 
-
 ES_list <- ES_ingest(cache)
 neuro_list <- neuro_ingest()
 
@@ -56,17 +56,6 @@ exp_df <- left_join(neuro_list[[2]],ES_list[[2]])
 
 rm(ES_list, neuro_list)
 cleaned_data <- list(meta_df, exp_df)
-save(cleaned_data, file = paste0(cache, "/seurat_ready.Rda"))
-
-#load packages
-library(readr); library(Seurat); 
-library(dplyr); library(stringr)
-library(naniar)
-
-##set globals
-cache <-  "/Users/roop/Desktop/SYBB459/"
-
-load(file = paste0(cache, "/seurat_ready.Rda"))
 
 clean_counts <- function() {
   
@@ -80,18 +69,20 @@ clean_counts <- function() {
   counts <- select(counts, -gene) %>% 
     as.matrix()
   #remove all non-numbers from cell names
-  colnames(counts) <- str_remove_all(colnames(counts), "[[:alpha:]]+")
-  colnames(counts) <- str_remove_all(colnames(counts), "_")
+  #colnames(counts) <- str_remove_all(colnames(counts), "[[:alpha:]]+")
+  #colnames(counts) <- str_remove_all(colnames(counts), "_")
   #assume all missing data had zero read counts
   counts[is.na(counts)] <- 0
   return(counts)
 }
 
 clean_meta <- function() {
-  meta <- cleaned_data[[1]]
-  meta <- meta %>% 
-    mutate(cell = str_remove_all(cell, "[[:alpha:]]+"), 
-           cell = str_remove_all(cell, "_"))
+  meta <- cleaned_data[[1]] %>% as.data.frame()
+  rownames(meta) <- meta$cell
+  meta %>% select(-cell)
+  #meta <- meta %>% 
+   # mutate(cell = str_remove_all(cell, "[[:alpha:]]+"), 
+    #       cell = str_remove_all(cell, "_"))
   return(meta)
 }
 counts <- clean_counts()
@@ -102,6 +93,8 @@ meta <- clean_meta()
 seur_obj <- CreateSeuratObject(counts = counts, project = "ES_origin", 
                                assay = "RNA",
                                meta.data = meta)
+
+
 ##add mitochondrial gene pct
 seur_obj[["percent.mt"]] <- PercentageFeatureSet(seur_obj, pattern = "^MT-")
 
@@ -136,7 +129,7 @@ seur_obj <- ScaleData(seur_obj, features = all.genes)
 #Perform linear dimensional reduction (PCA) and visualize using DimHeatmap
 seur_obj <- RunPCA(seur_obj, features = VariableFeatures(object = seur_obj))
 DimHeatmap(seur_obj, dims = 1:15, cells = 500, balanced = TRUE)
-DimPlot(seur_obj, reduction = "pca")
+DimPlot(seur_obj, reduction = "pca", group.by = "group")
 
 #Determine dimensionality of the dataset
 seur_obj <- JackStraw(seur_obj, num.replicate = 100)
@@ -151,7 +144,7 @@ head(Idents(seur_obj), 5)
 
 #Run non-linear dimensionality reduction
 seur_obj <- RunUMAP(seur_obj, dims = 1:10)
-DimPlot(seur_obj, reduction = "umap")
+DimPlot(seur_obj, reduction = "umap", group.by = "group")
 
 #Finding differentially expressed features (cluster biomarkers)
 seur_obj.markers <- FindAllMarkers(seur_obj, only.pos = TRUE, min.pct = 0.25, logfc.threshold = 0.25)
