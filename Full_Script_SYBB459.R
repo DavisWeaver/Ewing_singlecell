@@ -120,8 +120,10 @@ plot1 + plot2
 
 #Finding Variable Features
 seur_obj <- FindVariableFeatures(seur_obj, selection.method = "vst", nfeatures = 2000)
+
 # Identify the 10 most highly variable genes
 top10 <- head(VariableFeatures(seur_obj), 10)
+
 # plot variable features with and without labels
 plot1 <- VariableFeaturePlot(seur_obj)
 plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE)
